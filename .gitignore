@@ -27,6 +27,10 @@ yarn-error.log*
 .vercel/
 .render/
 
+# --- Local agent/tooling scratch -----------------------------------------
+.claude/
+CLAUDE.md
+
 # --- Editors / OS --------------------------------------------------------
 .vscode/*
 !.vscode/extensions.json
