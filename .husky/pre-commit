@@ -1,0 +1,11 @@
+# The Python formatters (ruff, black) live in the backend virtualenv. Git hooks
+# run in a bare shell that has not activated it, so put the venv's script
+# directory on PATH explicitly. Windows uses Scripts/, POSIX uses bin/.
+if [ -d "backend/.venv/Scripts" ]; then
+  PATH="$PWD/backend/.venv/Scripts:$PATH"
+elif [ -d "backend/.venv/bin" ]; then
+  PATH="$PWD/backend/.venv/bin:$PATH"
+fi
+export PATH
+
+npx lint-staged

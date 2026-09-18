@@ -1,0 +1,41 @@
+# Render Blueprint -- infrastructure for the CarbonIQ API as code.
+#
+# Only the backend is deployed here; the React frontend is deployed to Vercel.
+# Secrets are marked sync: false so they are entered in the Render dashboard
+# rather than committed to the repository.
+#
+# See: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: carboniq-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+      # Supabase session-pooler URI, prefixed postgresql+psycopg2://
+      - key: DATABASE_URL
+        sync: false
+
+      # python -c "import secrets; print(secrets.token_urlsafe(48))"
+      - key: JWT_SECRET
+        sync: false
+
+      # The deployed Vercel origin, e.g. https://carboniq.vercel.app
+      - key: FRONTEND_ORIGIN
+        sync: false
+
+      # Optional: regex allowing this project's Vercel preview deployments.
+      # e.g. ^https://carboniq-[a-z0-9-]+\.vercel\.app$
+      - key: VERCEL_PREVIEW_ORIGIN_REGEX
+        sync: false
+
+      - key: ENVIRONMENT
+        value: production

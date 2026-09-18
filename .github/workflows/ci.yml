@@ -1,0 +1,116 @@
+name: CI
+
+# Runs on every push to any branch and on every pull request into main. The
+# frontend and backend jobs are independent and run in parallel: a Python-only
+# change gets frontend feedback for free, and neither job can mask the other's
+# failure.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch cancels the in-flight run rather than queuing
+# behind it -- feedback is about the latest commit, not a stale one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend -- format, lint, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      # Root install provides Prettier, which is shared by the pre-commit hook
+      # and this workflow so that both enforce exactly one formatting standard.
+      - name: Install root tooling
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+        working-directory: frontend
+
+      # A production build catches what linting cannot: bad imports, failed
+      # module resolution, and anything that only breaks under Rollup.
+      # The VITE_* values are placeholders -- real ones are set in Vercel, and
+      # nothing in the build talks to a live service.
+      - name: Production build
+        run: npm run build
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+          VITE_MAPBOX_TOKEN: pk.ci-placeholder-token
+
+  backend:
+    name: Backend -- format, lint, test
+    runs-on: ubuntu-latest
+
+    # A throwaway PostGIS database for the duration of the job. Tests run
+    # against real PostGIS rather than a mock, because the behaviour under test
+    # (geometry storage and GeoJSON round-tripping) *is* PostGIS behaviour.
+    # Supabase is never touched by CI.
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: carboniq_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/carboniq_test
+      JWT_SECRET: ci-only-secret-not-used-anywhere-real
+      ENVIRONMENT: ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Check formatting
+        run: black --check .
+
+      # Applies db/schema.sql -- the same file used against Supabase. If the
+      # schema is invalid, CI fails here rather than in a confusing test error.
+      - name: Apply database schema
+        run: python db/apply_schema.py
+
+      - name: Test
+        run: pytest -v

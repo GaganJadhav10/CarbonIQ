@@ -1,0 +1,39 @@
+# Repository-wide Python tooling configuration.
+#
+# Lives at the root rather than in backend/ so that it also governs db/, and so
+# that ruff/black find the same settings no matter which directory they are
+# invoked from (the pre-commit hook runs them from the repository root).
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", "node_modules"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # import sorting
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "C4",  # comprehensions
+    "SIM", # simplify
+]
+ignore = [
+    # Function calls in argument defaults. This is the core FastAPI idiom
+    # (`db: Session = Depends(get_db)`), not a bug.
+    "B008",
+]
+
+[tool.ruff.lint.isort]
+# `app` is the backend package, not a third-party library. Without this, import
+# sorting shuffles application imports into the third-party block.
+known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]

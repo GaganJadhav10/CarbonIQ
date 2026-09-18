@@ -1,0 +1,16 @@
+{
+  "name": "carboniq-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Repository-root tooling only: Husky pre-commit hooks and lint-staged. Application code lives in frontend/ and backend/.",
+  "scripts": {
+    "prepare": "husky",
+    "format": "prettier --write \"**/*.{js,jsx,json,css,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,json,css,md,yml,yaml}\""
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3"
+  }
+}

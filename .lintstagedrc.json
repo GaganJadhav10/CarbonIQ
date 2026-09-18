@@ -1,0 +1,8 @@
+{
+  "frontend/**/*.{js,jsx}": [
+    "node frontend/node_modules/eslint/bin/eslint.js --config frontend/eslint.config.js --fix",
+    "prettier --write"
+  ],
+  "*.py": ["ruff check --fix", "black"],
+  "*.{json,css,md,yml,yaml}": ["prettier --write"]
+}
