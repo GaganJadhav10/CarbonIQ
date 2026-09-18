@@ -1,5 +1,6 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, BarChart3, MapPin, ShieldCheck } from 'lucide-react';
 
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
@@ -7,15 +8,25 @@ import { ColdStartNotice, Spinner } from './ui';
 
 const MIN_PASSWORD_LENGTH = 8;
 
+const HIGHLIGHTS = [
+  { Icon: MapPin, text: 'Draw site boundaries directly on the map' },
+  { Icon: BarChart3, text: 'Track carbon, canopy and biodiversity over time' },
+  { Icon: ShieldCheck, text: 'Your projects are visible only to you' },
+];
+
 /**
- * Shared sign-in / sign-up form.
+ * Shared sign-in / sign-up screen.
  *
- * One component for both modes because the fields, validation, and error
+ * One component for both modes because the fields, validation and error
  * handling are identical -- only the copy and the submit action differ.
+ *
+ * The split layout exists so the screen explains what the product is. It was
+ * previously a bare card on an empty background, which told a first-time
+ * visitor nothing at all.
  */
 export default function AuthForm({ mode }) {
   const isRegister = mode === 'register';
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, startDemo } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -23,6 +34,7 @@ export default function AuthForm({ mode }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDemoStarting, setIsDemoStarting] = useState(false);
   const [isSlow, setIsSlow] = useState(false);
 
   function validate() {
@@ -39,16 +51,13 @@ export default function AuthForm({ mode }) {
     return Object.keys(errors).length === 0;
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
+  async function runWithFeedback(action, setBusy) {
     setFormError(null);
-    if (!validate()) return;
-
-    setIsSubmitting(true);
-    const slowTimer = setTimeout(() => setIsSlow(true), 2500);
+    setBusy(true);
+    const slowTimer = setTimeout(() => setIsSlow(true), 2200);
 
     try {
-      await (isRegister ? signUp(email.trim(), password) : signIn(email.trim(), password));
+      await action();
       navigate('/projects', { replace: true });
     } catch (error) {
       setFormError(
@@ -57,96 +66,159 @@ export default function AuthForm({ mode }) {
     } finally {
       clearTimeout(slowTimer);
       setIsSlow(false);
-      setIsSubmitting(false);
+      setBusy(false);
     }
   }
 
+  function handleSubmit(event) {
+    event.preventDefault();
+    if (!validate()) return;
+
+    runWithFeedback(
+      () => (isRegister ? signUp(email.trim(), password) : signIn(email.trim(), password)),
+      setIsSubmitting
+    );
+  }
+
+  const isBusy = isSubmitting || isDemoStarting;
+
   return (
     <div className="auth-layout">
-      <div className="card auth-card">
-        <h1 className="card__title">{isRegister ? 'Create an account' : 'Sign in'}</h1>
-        <p className="card__subtitle">
-          {isRegister
-            ? 'Set up an administrator account to manage projects and sites.'
-            : 'Sign in to manage your monitoring projects.'}
-        </p>
+      {/* Brand panel: hidden on narrow screens, where it would push the form
+          below the fold rather than adding context. */}
+      <aside className="auth-aside">
+        <Link to="/" className="brand brand--inverse">
+          <img className="brand__mark" src="/favicon.svg" alt="" />
+          CarbonIQ
+        </Link>
 
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              aria-invalid={Boolean(fieldErrors.email)}
-              aria-describedby={fieldErrors.email ? 'email-error' : undefined}
-            />
-            {fieldErrors.email && (
-              <p className="field__error" id="email-error">
-                {fieldErrors.email}
-              </p>
+        <div className="auth-aside__body">
+          <h2>Geospatial analytics for land restoration.</h2>
+          <p>
+            Manage carbon and biodiversity monitoring programmes — from project setup through to
+            site-level performance over time.
+          </p>
+
+          <ul className="auth-aside__list">
+            {HIGHLIGHTS.map(({ Icon, text }) => (
+              <li key={text}>
+                <Icon size={17} aria-hidden="true" />
+                {text}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="auth-aside__footnote">Demo data is synthetic, not real measurement data.</p>
+      </aside>
+
+      <main className="auth-main">
+        <div className="auth-card">
+          <Link to="/" className="auth-card__back">
+            <ArrowLeft size={15} aria-hidden="true" />
+            Back
+          </Link>
+
+          <h1>{isRegister ? 'Create your account' : 'Welcome back'}</h1>
+          <p className="auth-card__lede">
+            {isRegister
+              ? 'Set up an administrator account to manage projects and sites.'
+              : 'Sign in to manage your monitoring projects.'}
+          </p>
+
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="field">
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                aria-invalid={Boolean(fieldErrors.email)}
+                aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+              />
+              {fieldErrors.email && (
+                <p className="field__error" id="email-error">
+                  {fieldErrors.email}
+                </p>
+              )}
+            </div>
+
+            <div className="field">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                aria-invalid={Boolean(fieldErrors.password)}
+                aria-describedby={
+                  fieldErrors.password ? 'password-error' : isRegister ? 'password-hint' : undefined
+                }
+              />
+              {isRegister && !fieldErrors.password && (
+                <p className="field__hint" id="password-hint">
+                  At least {MIN_PASSWORD_LENGTH} characters.
+                </p>
+              )}
+              {fieldErrors.password && (
+                <p className="field__error" id="password-error">
+                  {fieldErrors.password}
+                </p>
+              )}
+            </div>
+
+            {formError && (
+              <div className="notice notice--error mt-4" role="alert">
+                {formError}
+              </div>
             )}
-          </div>
 
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete={isRegister ? 'new-password' : 'current-password'}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              aria-invalid={Boolean(fieldErrors.password)}
-              aria-describedby={fieldErrors.password ? 'password-error' : undefined}
-            />
-            {fieldErrors.password && (
-              <p className="field__error" id="password-error">
-                {fieldErrors.password}
-              </p>
+            {isSlow && isBusy && (
+              <div className="mt-4">
+                <ColdStartNotice />
+              </div>
             )}
-          </div>
 
-          {formError && (
-            <div
-              className="notice notice--error"
-              role="alert"
-              style={{ marginTop: 'var(--space-4)' }}
+            <button
+              type="submit"
+              className="button button--primary button--block button--lg mt-5"
+              disabled={isBusy}
             >
-              {formError}
-            </div>
-          )}
+              {isSubmitting && <Spinner />}
+              {isSubmitting ? 'Working…' : isRegister ? 'Create account' : 'Sign in'}
+            </button>
+          </form>
 
-          {isSlow && (
-            <div style={{ marginTop: 'var(--space-4)' }}>
-              <ColdStartNotice />
-            </div>
-          )}
+          <div className="auth-card__divider">
+            <span>or</span>
+          </div>
 
           <button
-            type="submit"
-            className="button button--primary button--block"
-            style={{ marginTop: 'var(--space-5)' }}
-            disabled={isSubmitting}
+            type="button"
+            className="button button--secondary button--block"
+            onClick={() => runWithFeedback(startDemo, setIsDemoStarting)}
+            disabled={isBusy}
           >
-            {isSubmitting && <Spinner />}
-            {isSubmitting ? 'Workingâ€¦' : isRegister ? 'Create account' : 'Sign in'}
+            {isDemoStarting && <Spinner />}
+            {isDemoStarting ? 'Preparing your demo…' : 'Explore the demo instead'}
           </button>
-        </form>
 
-        <p className="auth-card__switch">
-          {isRegister ? (
-            <>
-              Already have an account? <Link to="/login">Sign in</Link>
-            </>
-          ) : (
-            <>
-              No account yet? <Link to="/register">Create one</Link>
-            </>
-          )}
-        </p>
-      </div>
+          <p className="auth-card__switch">
+            {isRegister ? (
+              <>
+                Already have an account? <Link to="/login">Sign in</Link>
+              </>
+            ) : (
+              <>
+                No account yet? <Link to="/register">Create one</Link>
+              </>
+            )}
+          </p>
+        </div>
+      </main>
     </div>
   );
 }

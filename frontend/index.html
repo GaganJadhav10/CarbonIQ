@@ -8,10 +8,39 @@
       content="CarbonIQ -- geospatial project and site analytics for carbon and biodiversity monitoring."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>CarbonIQ</title>
+
+    <!-- Inter is referenced by --font-sans. Without these it silently falls
+         back to the system UI font. preconnect opens the connections during
+         HTML parse; display=swap renders text immediately in the fallback
+         rather than blocking on the download. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>CarbonIQ — Geospatial project &amp; site analytics</title>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Applies the saved theme before first paint. Without this, a visitor who
+         chose dark would see a white flash while React boots. Deliberately
+         inline and synchronous: an external script would be too late. -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('carboniq.theme');
+          if (saved === 'light' || saved === 'dark') {
+            document.documentElement.setAttribute('data-theme', saved);
+          }
+        } catch (error) {
+          // Storage blocked (private mode). Fall back to prefers-color-scheme.
+        }
+      })();
+    </script>
+
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

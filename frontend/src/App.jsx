@@ -1,10 +1,11 @@
-﻿import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 
 import AppShell from './components/AppShell';
 import AuthForm from './components/AuthForm';
 import SystemStatus from './components/SystemStatus';
 import { Spinner } from './components/ui';
 import { useAuth } from './lib/auth-context';
+import LandingPage from './pages/LandingPage';
 import MapPage from './pages/MapPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -41,6 +42,14 @@ function RedirectIfAuthenticated({ children }) {
 export default function App() {
   return (
     <Routes>
+      <Route
+        path="/"
+        element={
+          <RedirectIfAuthenticated>
+            <LandingPage />
+          </RedirectIfAuthenticated>
+        }
+      />
       <Route
         path="/login"
         element={

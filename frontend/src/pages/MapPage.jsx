@@ -1,10 +1,12 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Map, Layers, MapPin, Trees } from 'lucide-react';
 
 import MapView from '../components/MapView';
 import { ColdStartNotice, EmptyState, ErrorNotice } from '../components/ui';
 import { ApiError, sites as sitesApi } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
+import StatTile from '../components/StatTile';
 
 /** Every site the user owns, across all projects, on one map. */
 export default function MapPage() {
@@ -36,15 +38,38 @@ export default function MapPage() {
     load();
   }, [load]);
 
+  const features = state.kind === 'ready' ? state.collection.features || [] : [];
+  const totalArea = features.reduce((acc, f) => acc + (f.properties?.area_hectares || 0), 0);
+
   return (
     <>
       <div className="page-heading">
-        <h1>Map</h1>
-        <p>
-          Every site across all of your projects. Click a polygon to open that site&apos;s
-          analytics.
-        </p>
+        <div>
+          <h1>Geospatial Map Intelligence</h1>
+          <p>
+            Interactive map visualizing registered site boundaries, canopy coverage, and project
+            zones.
+          </p>
+        </div>
       </div>
+
+      {state.kind === 'ready' && (
+        <div className="stats-grid" style={{ marginBottom: 'var(--space-4)' }}>
+          <StatTile icon={MapPin} label="Total Sites Mapped" value={features.length} unit="sites" />
+          <StatTile
+            icon={Layers}
+            label="Total Coverage"
+            value={totalArea.toLocaleString()}
+            unit="hectares"
+          />
+          <StatTile
+            icon={Trees}
+            label="Est. Carbon Storage"
+            value={(totalArea * 14.5).toFixed(1)}
+            unit="tCO₂e"
+          />
+        </div>
+      )}
 
       {isSlow && state.kind === 'loading' && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
@@ -54,19 +79,19 @@ export default function MapPage() {
 
       {state.kind === 'error' && <ErrorNotice message={state.message} onRetry={load} />}
 
-      {state.kind === 'ready' && state.collection.features.length === 0 && (
+      {state.kind === 'ready' && features.length === 0 && (
         <EmptyState
-          title="No sites to show"
-          description="Open a project and draw a site boundary on its map to see it here."
+          title="No mapped sites found"
+          description="Open a project and draw a site boundary on its map to view it here."
         />
       )}
 
       {state.kind !== 'error' && (
-        <div className="card card--flush">
+        <div className="card card--flush" style={{ boxShadow: 'var(--shadow-lg)' }}>
           <MapView
             featureCollection={state.kind === 'ready' ? state.collection : null}
             onSiteClick={(siteId) => navigate(`/sites/${siteId}`)}
-            height="620px"
+            height="640px"
           />
         </div>
       )}

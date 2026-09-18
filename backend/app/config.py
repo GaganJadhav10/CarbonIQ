@@ -7,6 +7,7 @@ them) and fall back to backend/.env for local development.
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -36,6 +37,17 @@ class Settings(BaseSettings):
     vercel_preview_origin_regex: str | None = None
 
     environment: str = "development"
+
+    @field_validator("vercel_preview_origin_regex", mode="after")
+    @classmethod
+    def blank_regex_means_unset(cls, value: str | None) -> str | None:
+        """Treat an empty value as absent.
+
+        Render supplies declared-but-unfilled variables as empty strings. Left
+        as "", it would reach Starlette as a real regex that matches nothing --
+        harmless, but it hides the fact that preview origins are unconfigured.
+        """
+        return value or None
 
     @property
     def cors_origins(self) -> list[str]:

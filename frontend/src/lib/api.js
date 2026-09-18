@@ -127,6 +127,15 @@ export const auth = {
     apiFetch('/api/auth/login', { method: 'POST', body: { email, password }, ...options }),
 
   me: (options) => apiFetch('/api/auth/me', options),
+
+  /**
+   * Provision a throwaway guest account preloaded with the demo dataset.
+   *
+   * Deliberately a server-side endpoint rather than logging in with demo
+   * credentials embedded in this bundle: shipping a password as a string
+   * literal in client code is a poor pattern even when the account is public.
+   */
+  demo: (options) => apiFetch('/api/auth/demo', { method: 'POST', ...options }),
 };
 
 export const projects = {

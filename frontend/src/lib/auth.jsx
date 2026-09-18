@@ -85,6 +85,9 @@ export function AuthProvider({ children }) {
     [applySession]
   );
 
+  /** Provision and sign into a guest account preloaded with demo data. */
+  const startDemo = useCallback(async () => applySession(await authApi.demo()), [applySession]);
+
   /**
    * Call an endpoint with the current token, signing out on a 401.
    *
@@ -110,12 +113,14 @@ export function AuthProvider({ children }) {
       token: session?.token ?? null,
       isAuthenticated: Boolean(session?.token),
       isRestoring,
+      isGuest: Boolean(session?.user?.email?.endsWith('@carboniq.demo')),
       signIn,
       signUp,
       signOut,
+      startDemo,
       request,
     }),
-    [session, isRestoring, signIn, signUp, signOut, request]
+    [session, isRestoring, signIn, signUp, signOut, startDemo, request]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
