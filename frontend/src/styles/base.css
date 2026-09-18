@@ -1,0 +1,158 @@
+/* =============================================================================
+   Reset, base typography, and the type scale — DESIGN.md §3.2.
+
+   Sentence case everywhere. No all-caps labels, no letter-spaced eyebrows.
+   ============================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100svh;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 14px / 20px var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- Type scale (§3.2) ----------------------------------------------------
+   Serif is used sparingly: page titles, panel titles, site names and the one
+   large indicator figure. Everything else is Public Sans. */
+
+.t-page-title {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  line-height: 38px;
+  font-weight: 600;
+}
+
+.t-indicator {
+  font-family: var(--font-serif);
+  font-size: 44px;
+  line-height: 48px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-panel-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.t-section {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.t-body {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.t-small {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+  /* §3.2: body line length under 75 characters. */
+  max-width: 72ch;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+}
+
+/* Figures never shift as values change (§3.2). Data stays in Public Sans —
+   a monospace face for small data labels is a §12 anti-pattern. */
+.tabular,
+td,
+th {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* First tab stop on every page. */
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: -80px;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  text-decoration: none;
+  transition: top var(--t-highlight) var(--ease-out);
+}
+
+.skip-link:focus-visible {
+  top: var(--space-4);
+}
+
+/* §9: with reduced motion, transitions go to zero. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

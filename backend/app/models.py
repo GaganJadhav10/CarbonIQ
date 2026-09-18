@@ -41,6 +41,11 @@ class Project(Base):
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+
+    # 'carbon' | 'biodiversity' | 'both'. Constrained in the database; the
+    # allowed values are mirrored by the Pydantic Literal in schemas.py.
+    project_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="carbon")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

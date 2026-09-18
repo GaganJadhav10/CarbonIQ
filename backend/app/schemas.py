@@ -63,9 +63,13 @@ class UserResponse(BaseModel):
 # --- Projects ----------------------------------------------------------------
 
 
+ProjectType = Literal["carbon", "biodiversity", "both"]
+
+
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
+    project_type: ProjectType = "carbon"
 
     @field_validator("name", "description")
     @classmethod
@@ -79,8 +83,14 @@ class ProjectResponse(BaseModel):
     id: int
     name: str
     description: str | None
+    project_type: ProjectType
     created_at: datetime
+
+    # Ledger columns (DESIGN.md §5.2). Computed in the list query rather than
+    # per row, so the dashboard costs one round trip regardless of project count.
     site_count: int = 0
+    total_area_hectares: float = 0.0
+    last_updated: datetime | None = None
 
 
 # --- Sites -------------------------------------------------------------------
@@ -138,6 +148,18 @@ class SiteProperties(BaseModel):
     project_name: str
     created_at: datetime
     area_hectares: float = Field(description="Geodesic area, computed by PostGIS.")
+
+    # Ledger extras (DESIGN.md §5.3): the headline indicator and the points
+    # behind the 60px sparkline on each site row.
+    latest_score: float | None = Field(
+        default=None, description="Most recent biodiversity score, if recorded."
+    )
+    sparkline: list[float] = Field(
+        default_factory=list, description="Recent biodiversity scores, oldest first."
+    )
+    centroid: tuple[float, float] | None = Field(
+        default=None, description="Polygon centroid as [longitude, latitude]."
+    )
 
 
 class SiteFeature(BaseModel):

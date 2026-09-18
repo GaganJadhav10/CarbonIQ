@@ -32,13 +32,20 @@ router = APIRouter(prefix="/sites", tags=["sites"])
 
 SQUARE_METRES_PER_HECTARE = 10_000
 
+# The indicator shown on each site row in the ledger (DESIGN.md §5.3).
+LEDGER_METRIC = "biodiversity_score"
+
+# How many recent points the 60px sparkline draws.
+SPARKLINE_POINTS = 12
+
 
 def _site_feature_select(current_user: User) -> Select:
     """Select every column needed to build a GeoJSON Feature, owner-scoped.
 
     ST_AsGeoJSON returns the geometry as a JSON string; casting the boundary to
     `geography` before ST_Area gives a true geodesic area in square metres
-    rather than meaningless squared degrees.
+    rather than meaningless squared degrees. ST_Centroid gives the drawer its
+    coordinate readout without the client having to average the ring.
     """
     return (
         select(
@@ -52,13 +59,40 @@ def _site_feature_select(current_user: User) -> Select:
                 func.ST_Area(cast(Site.boundary, Geography(geometry_type="POLYGON", srid=4326)))
                 / SQUARE_METRES_PER_HECTARE
             ).label("area_hectares"),
+            func.ST_X(func.ST_Centroid(Site.boundary)).label("centroid_lng"),
+            func.ST_Y(func.ST_Centroid(Site.boundary)).label("centroid_lat"),
         )
         .join(Project, Project.id == Site.project_id)
         .where(Project.owner_id == current_user.id)
     )
 
 
-def _row_to_feature(row) -> SiteFeature:
+def _load_sparklines(db: Session, site_ids: list[int]) -> dict[int, list[float]]:
+    """Recent ledger-metric values for each site, oldest first.
+
+    One query for every site on the page rather than one per row: the ledger
+    renders a sparkline per site, and a per-row query would be an N+1 that only
+    shows up once someone has a realistic number of sites.
+    """
+    if not site_ids:
+        return {}
+
+    rows = db.execute(
+        select(SiteMetric.site_id, SiteMetric.value, SiteMetric.recorded_at)
+        .where(SiteMetric.site_id.in_(site_ids), SiteMetric.metric_name == LEDGER_METRIC)
+        .order_by(SiteMetric.site_id, SiteMetric.recorded_at)
+    ).all()
+
+    series: dict[int, list[float]] = {}
+    for site_id, value, _ in rows:
+        series.setdefault(site_id, []).append(float(value))
+
+    return {site_id: values[-SPARKLINE_POINTS:] for site_id, values in series.items()}
+
+
+def _row_to_feature(row, sparkline: list[float] | None = None) -> SiteFeature:
+    points = sparkline or []
+
     return SiteFeature(
         id=row.id,
         geometry=PolygonGeometry.model_validate(json.loads(row.geometry)),
@@ -69,6 +103,9 @@ def _row_to_feature(row) -> SiteFeature:
             project_name=row.project_name,
             created_at=row.created_at,
             area_hectares=round(float(row.area_hectares), 2),
+            latest_score=points[-1] if points else None,
+            sparkline=points,
+            centroid=(round(row.centroid_lng, 6), round(row.centroid_lat, 6)),
         ),
     )
 

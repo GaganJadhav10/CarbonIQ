@@ -37,6 +37,23 @@ create table if not exists projects (
 
 create index if not exists projects_owner_id_idx on projects (owner_id);
 
+-- Project classification, used by the dashboard's type filter and type chip.
+-- Added as an idempotent ALTER rather than in the CREATE above so that this
+-- file stays safe to re-run against a database that already holds data.
+alter table projects
+    add column if not exists project_type text not null default 'carbon';
+
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint where conname = 'projects_project_type_check'
+    ) then
+        alter table projects
+            add constraint projects_project_type_check
+            check (project_type in ('carbon', 'biodiversity', 'both'));
+    end if;
+end $$;
+
 -- -----------------------------------------------------------------------------
 -- sites -- a geographic area within a project, drawn as a polygon on the map.
 --

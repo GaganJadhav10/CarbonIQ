@@ -66,41 +66,52 @@ def _rectangle(west: float, south: float, east: float, north: float) -> dict:
     }
 
 
-# (project name, description, [(site name, bbox), ...])
-DEMO_PROJECTS: list[tuple[str, str, list[tuple[str, dict]]]] = [
+# (project name, type, description, [(site name, bbox), ...])
+DEMO_PROJECTS: list[tuple[str, str, str, list[tuple[str, dict]]]] = [
     (
-        "Western Ghats Reforestation",
+        "Western Ghats reforestation",
+        "carbon",
         "Native species restoration across degraded slopes in the Western Ghats, "
         "tracking carbon accumulation and canopy recovery.",
         [
-            ("Agumbe Slope Block A", _rectangle(75.06, 13.49, 75.14, 13.55)),
-            ("Kudremukh Corridor", _rectangle(75.22, 13.18, 75.32, 13.26)),
+            ("Agumbe slope block A", _rectangle(75.06, 13.49, 75.14, 13.55)),
+            ("Kudremukh corridor", _rectangle(75.22, 13.18, 75.32, 13.26)),
         ],
     ),
     (
-        "Sundarbans Mangrove Monitoring",
+        "Sundarbans mangrove monitoring",
+        "both",
         "Mangrove extent and blue-carbon monitoring across tidal creek systems "
         "in the Sundarbans delta.",
         [
-            ("Netidhopani Creek", _rectangle(88.78, 21.86, 88.88, 21.94)),
-            ("Sajnekhali Buffer", _rectangle(88.80, 22.10, 88.90, 22.18)),
+            ("Netidhopani creek", _rectangle(88.78, 21.86, 88.88, 21.94)),
+            ("Sajnekhali buffer", _rectangle(88.80, 22.10, 88.90, 22.18)),
         ],
     ),
     (
-        "Nilgiris Biodiversity Baseline",
+        "Nilgiris biodiversity baseline",
+        "biodiversity",
         "Shola grassland biodiversity baselining ahead of a restoration "
         "programme in the Nilgiri hills.",
         [
-            ("Mukurthi Plateau", _rectangle(76.48, 11.20, 76.56, 11.28)),
+            ("Mukurthi plateau", _rectangle(76.48, 11.20, 76.56, 11.28)),
         ],
     ),
 ]
 
-# (metric name, unit, starting value, monthly drift, noise amplitude, decimals)
-METRIC_PROFILES: list[tuple[str, str, float, float, float, int]] = [
-    ("carbon_sequestered", "tCO2e", 120.0, 8.5, 6.0, 1),
-    ("canopy_cover", "%", 41.0, 0.55, 1.2, 1),
-    ("species_count", "species", 68.0, 0.4, 3.0, 0),
+# The five indicators the dashboard charts, matching DESIGN.md section 5.4.
+#
+# (metric name, unit, start, monthly drift, noise amplitude, decimals, floor, ceiling)
+#
+# `human_intrusion_index` drifts downward on purpose: it is the one metric where
+# a falling value is an improvement, which exercises the better/worse rule in
+# the change indicator rather than leaving it untested.
+METRIC_PROFILES: list[tuple[str, str, float, float, float, int, float, float]] = [
+    ("biodiversity_score", "score", 58.0, 0.42, 1.4, 1, 0.0, 100.0),
+    ("species_richness", "species", 68.0, 0.40, 3.0, 0, 0.0, 400.0),
+    ("human_intrusion_index", "index", 34.0, -0.35, 1.6, 1, 0.0, 100.0),
+    ("ndvi", "index", 0.52, 0.006, 0.02, 2, -1.0, 1.0),
+    ("carbon_stock", "tCO2e", 1180.0, 14.5, 9.0, 1, 0.0, 1_000_000.0),
 ]
 
 
@@ -117,20 +128,21 @@ def _month_starts(count: int, end: date) -> list[date]:
 
 
 def _generate_series(
-    rng: random.Random, profile: tuple[str, str, float, float, float, int], dates: list[date]
+    rng: random.Random,
+    profile: tuple[str, str, float, float, float, int, float, float],
+    dates: list[date],
 ) -> list[tuple[str, str, float, date]]:
     """Generate one metric's history: a linear trend plus bounded noise."""
-    name, unit, start, drift, noise, decimals = profile
+    name, unit, start, drift, noise, decimals, floor, ceiling = profile
     rows = []
 
     for index, observed_on in enumerate(dates):
         value = start + drift * index + rng.uniform(-noise, noise)
 
-        # Percentages must stay a percentage, and counts must stay positive --
-        # noise should look like measurement variance, not corrupt the data.
-        if unit == "%":
-            value = min(max(value, 0.0), 100.0)
-        value = max(value, 0.0)
+        # Clamp to the metric's real range so the noise reads as measurement
+        # variance rather than producing an impossible value (a negative species
+        # count, or an NDVI above 1).
+        value = min(max(value, floor), ceiling)
 
         rows.append((name, unit, round(value, decimals), observed_on))
 
@@ -164,8 +176,13 @@ def seed(session: Session, reset: bool) -> None:
     site_total = 0
     metric_total = 0
 
-    for project_name, description, site_specs in DEMO_PROJECTS:
-        project = Project(owner_id=user.id, name=project_name, description=description)
+    for project_name, project_type, description, site_specs in DEMO_PROJECTS:
+        project = Project(
+            owner_id=user.id,
+            name=project_name,
+            description=description,
+            project_type=project_type,
+        )
         session.add(project)
         session.flush()
 

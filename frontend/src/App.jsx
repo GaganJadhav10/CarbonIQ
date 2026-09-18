@@ -1,60 +1,76 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 
 import AppShell from './components/AppShell';
-import AuthForm from './components/AuthForm';
-import SystemStatus from './components/SystemStatus';
-import { Spinner } from './components/ui';
+import { sites as sitesApi } from './lib/api';
 import { useAuth } from './lib/auth-context';
-import LandingPage from './pages/LandingPage';
-import MapPage from './pages/MapPage';
-import ProjectDetailPage from './pages/ProjectDetailPage';
+import AuthPage from './pages/AuthPage';
 import ProjectsPage from './pages/ProjectsPage';
-import SiteDetailPage from './pages/SiteDetailPage';
+import WorkspacePage from './pages/WorkspacePage';
 
 /**
  * Gate for authenticated routes.
  *
- * While a stored token is being revalidated we render a spinner rather than
- * redirecting: bouncing the user to /login on every refresh and then back again
- * would be a visible flicker on a session that was perfectly valid.
+ * While a stored token is being revalidated nothing is rendered: redirecting to
+ * /login and straight back again would flash the sign-in screen at someone
+ * whose session was perfectly valid.
  */
 function RequireAuth({ children }) {
   const { isAuthenticated, isRestoring } = useAuth();
 
-  if (isRestoring) {
-    return (
-      <div className="full-page-centre">
-        <Spinner label="Restoring your session" />
-      </div>
-    );
-  }
-
+  if (isRestoring) return null;
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
-/** Keeps signed-in users away from the auth screens. */
 function RedirectIfAuthenticated({ children }) {
   const { isAuthenticated, isRestoring } = useAuth();
+
   if (isRestoring) return null;
   return isAuthenticated ? <Navigate to="/projects" replace /> : children;
+}
+
+/**
+ * Deep link for a site.
+ *
+ * Analytics moved from a page into a drawer over the workspace map, but
+ * /sites/:id URLs already exist, so this resolves the site's project and
+ * forwards to the workspace with that site selected.
+ */
+function SiteRedirect() {
+  const { siteId } = useParams();
+  const { request } = useAuth();
+  const navigate = useNavigate();
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    request((options) => sitesApi.get(siteId, options))
+      .then((site) => {
+        if (!cancelled) {
+          navigate(`/projects/${site.properties.project_id}?site=${siteId}`, { replace: true });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [siteId, request, navigate]);
+
+  return failed ? <Navigate to="/projects" replace /> : null;
 }
 
 export default function App() {
   return (
     <Routes>
       <Route
-        path="/"
-        element={
-          <RedirectIfAuthenticated>
-            <LandingPage />
-          </RedirectIfAuthenticated>
-        }
-      />
-      <Route
         path="/login"
         element={
           <RedirectIfAuthenticated>
-            <AuthForm mode="login" />
+            <AuthPage mode="login" />
           </RedirectIfAuthenticated>
         }
       />
@@ -62,7 +78,7 @@ export default function App() {
         path="/register"
         element={
           <RedirectIfAuthenticated>
-            <AuthForm mode="register" />
+            <AuthPage mode="register" />
           </RedirectIfAuthenticated>
         }
       />
@@ -75,21 +91,8 @@ export default function App() {
         }
       >
         <Route path="/projects" element={<ProjectsPage />} />
-        <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
-        <Route path="/map" element={<MapPage />} />
-        <Route path="/sites/:siteId" element={<SiteDetailPage />} />
-        <Route
-          path="/status"
-          element={
-            <>
-              <div className="page-heading">
-                <h1>System status</h1>
-                <p>Live connectivity across the frontend, API, and database.</p>
-              </div>
-              <SystemStatus />
-            </>
-          }
-        />
+        <Route path="/projects/:projectId" element={<WorkspacePage />} />
+        <Route path="/sites/:siteId" element={<SiteRedirect />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/projects" replace />} />

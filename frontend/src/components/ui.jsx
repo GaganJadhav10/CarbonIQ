@@ -1,113 +1,174 @@
 import { useEffect, useRef } from 'react';
-import { AlertCircle, RotateCw, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
-/** Small presentational primitives shared across pages. */
+/**
+ * Shared primitives — DESIGN.md §6.
+ *
+ * Icons appear only where they carry meaning (close, draw, delete, overflow),
+ * never as decoration and never inside a coloured circle.
+ */
 
-export function Spinner({ label = 'Loading' }) {
+/* --- Button --------------------------------------------------------------- */
+
+export function Button({
+  variant = 'secondary',
+  loading = false,
+  block = false,
+  children,
+  className = '',
+  ...rest
+}) {
   return (
-    <span className="spinner" role="status" aria-label={label}>
-      <span className="visually-hidden">{label}</span>
-    </span>
+    <button
+      className={`btn btn--${variant}${block ? ' btn--block' : ''} ${className}`.trim()}
+      // Loading keeps the label and adds an inline indicator (§6), so the
+      // button never changes width mid-action.
+      disabled={loading || rest.disabled}
+      {...rest}
+    >
+      {loading && <span className="btn__spinner" aria-hidden="true" />}
+      {children}
+    </button>
   );
 }
 
-export function ErrorNotice({ title = 'Something went wrong', message, onRetry }) {
+export function IconButton({ label, children, className = '', ...rest }) {
   return (
-    <div className="notice notice--error" role="alert">
-      <p className="notice__title">
-        <AlertCircle size={16} aria-hidden="true" /> {title}
-      </p>
-      <p>{message}</p>
-      {onRetry && (
-        <button type="button" className="button button--secondary mt-3" onClick={onRetry}>
-          <RotateCw size={15} aria-hidden="true" />
-          Try again
+    <button className={`icon-btn ${className}`.trim()} aria-label={label} title={label} {...rest}>
+      {children}
+    </button>
+  );
+}
+
+/* --- Fields --------------------------------------------------------------- */
+
+/**
+ * Text input with the label always above it (§6 forbids placeholder-only
+ * labels) and helper text shown before any error occurs (§5.1).
+ */
+export function Field({ id, label, help, error, as = 'input', ...rest }) {
+  const describedBy = error ? `${id}-error` : help ? `${id}-help` : undefined;
+  const Tag = as;
+
+  return (
+    <div className="field">
+      <label className="field__label" htmlFor={id}>
+        {label}
+      </label>
+      <Tag
+        id={id}
+        className="field__input"
+        aria-invalid={error ? 'true' : undefined}
+        aria-describedby={describedBy}
+        {...rest}
+      />
+      {help && !error && (
+        <p className="field__help" id={`${id}-help`}>
+          {help}
+        </p>
+      )}
+      {error && (
+        <p className="field__error" id={`${id}-error`}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* --- Segmented control ---------------------------------------------------- */
+
+/**
+ * Used for the project type filter, the metric switcher and the time range (§6).
+ *
+ * Rendered as radios rather than buttons so arrow keys move between options and
+ * screen readers announce it as one choice with a selected member.
+ */
+export function Segmented({ value, options, onChange, label }) {
+  return (
+    <div className="segmented" role="radiogroup" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="radio"
+          aria-checked={option.value === value}
+          className="segmented__option"
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
         </button>
-      )}
-    </div>
-  );
-}
-
-export function EmptyState({ icon: Icon, title, description, action }) {
-  return (
-    <div className="empty-state">
-      {Icon && (
-        <span className="empty-state__icon" aria-hidden="true">
-          <Icon size={22} />
-        </span>
-      )}
-      <h3>{title}</h3>
-      {description && <p>{description}</p>}
-      {action && <div className="empty-state__action">{action}</div>}
-    </div>
-  );
-}
-
-export function ColdStartNotice() {
-  return (
-    <div className="notice notice--info">
-      <p className="notice__title">Waking up the API</p>
-      <p>
-        The API runs on Render&apos;s free tier, which sleeps after inactivity. The first request
-        can take up to a minute.
-      </p>
-    </div>
-  );
-}
-
-export function SkeletonList({ rows = 3 }) {
-  return (
-    <div className="stack" aria-hidden="true">
-      {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="card">
-          <div className="skeleton skeleton--title" />
-          <div className="skeleton skeleton--line" />
-        </div>
       ))}
     </div>
   );
 }
 
-/**
- * Placeholder sized to the map or chart it stands in for, to avoid layout shift.
- *
- * The height arrives as a CSS custom property rather than an inline `height`:
- * it parameterises the class instead of overriding it, so the styling stays in
- * the stylesheet where the rest of the design system lives.
- */
-export function SkeletonBlock({ height = '320px', label = 'Loading' }) {
+/* --- Chip ----------------------------------------------------------------- */
+
+/** Text only, no icons (§6). */
+export function Chip({ children, variant }) {
+  return <span className={`chip${variant ? ` chip--${variant}` : ''}`}>{children}</span>;
+}
+
+/* --- States --------------------------------------------------------------- */
+
+/** Skeleton rows match the real row height so nothing shifts on load (§5.5). */
+export function SkeletonRows({ rows = 5 }) {
   return (
-    <div
-      className="skeleton skeleton--block"
-      style={{ '--skeleton-height': height }}
-      role="status"
-      aria-label={label}
-    >
-      <span className="visually-hidden">{label}</span>
+    <div aria-hidden="true">
+      {Array.from({ length: rows }, (_, index) => (
+        <div key={index} className="skeleton skeleton--row" />
+      ))}
     </div>
   );
 }
 
+export function SkeletonChart() {
+  return <div className="skeleton skeleton--chart" aria-hidden="true" />;
+}
+
+export function EmptyState({ message, action }) {
+  return (
+    <div className="empty">
+      <p className="muted">{message}</p>
+      {action}
+    </div>
+  );
+}
+
+/** Inline banner in the affected panel, never a full-page takeover (§5.5). */
+export function ErrorBanner({ message, onRetry }) {
+  return (
+    <div className="error-banner" role="alert">
+      <p>{message}</p>
+      {onRetry && (
+        <Button variant="secondary" onClick={onRetry}>
+          Try again
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/* --- Modal ---------------------------------------------------------------- */
+
 /**
- * Accessible modal dialog.
+ * Used for creating a project (§6).
  *
- * Uses the native <dialog> element so focus trapping, Escape-to-close, inertness
- * of the page behind it, and top-layer stacking all come from the platform
- * rather than being reimplemented (and half-implemented) in JavaScript.
+ * The native <dialog> element supplies focus trapping, Escape-to-close, page
+ * inertness and top-layer stacking, so none of that is reimplemented here.
+ * Focus returns to the trigger automatically when it closes.
  */
-export function Modal({ open, onClose, title, description, children }) {
+export function Modal({ open, onClose, title, children }) {
   const dialogRef = useRef(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-
     if (open && !dialog.open) dialog.showModal();
     else if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  // `cancel` fires on Escape. Routing it through onClose keeps React state and
-  // the dialog's own open state from drifting apart.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -126,23 +187,20 @@ export function Modal({ open, onClose, title, description, children }) {
       className="modal"
       aria-labelledby="modal-title"
       onClick={(event) => {
-        // The backdrop is the dialog element itself, so a click whose target is
-        // the dialog rather than its panel is by definition outside the panel.
+        // The backdrop is the dialog element itself, so a click landing on it
+        // rather than on the panel is by definition outside.
         if (event.target === dialogRef.current) onClose();
       }}
     >
       <div className="modal__panel">
-        <header className="modal__header">
-          <div>
-            <h2 className="card__title" id="modal-title">
-              {title}
-            </h2>
-            {description && <p className="card__subtitle modal__description">{description}</p>}
-          </div>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close dialog">
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
+        <div className="modal__head">
+          <h2 className="t-panel-title" id="modal-title">
+            {title}
+          </h2>
+          <IconButton label="Close" onClick={onClose}>
+            <X size={16} strokeWidth={1.5} aria-hidden="true" />
+          </IconButton>
+        </div>
         {children}
       </div>
     </dialog>

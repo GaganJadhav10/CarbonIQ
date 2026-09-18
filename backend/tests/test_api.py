@@ -123,7 +123,11 @@ class TestProjects:
     def test_create_then_list(self, client: TestClient, account: dict) -> None:
         client.post(
             "/api/projects",
-            json={"name": "Mangrove Monitoring", "description": "Blue carbon."},
+            json={
+                "name": "Mangrove Monitoring",
+                "description": "Blue carbon.",
+                "project_type": "biodiversity",
+            },
             headers=account["headers"],
         )
 
@@ -133,7 +137,41 @@ class TestProjects:
         projects = response.json()
         assert len(projects) == 1
         assert projects[0]["name"] == "Mangrove Monitoring"
+        assert projects[0]["project_type"] == "biodiversity"
         assert projects[0]["site_count"] == 0
+        assert projects[0]["total_area_hectares"] == 0.0
+
+    def test_project_type_defaults_to_carbon(self, client: TestClient, account: dict) -> None:
+        response = client.post(
+            "/api/projects", json={"name": "Untyped"}, headers=account["headers"]
+        )
+
+        assert response.json()["project_type"] == "carbon"
+
+    def test_invalid_project_type_is_rejected(self, client: TestClient, account: dict) -> None:
+        response = client.post(
+            "/api/projects",
+            json={"name": "Bad type", "project_type": "forestry"},
+            headers=account["headers"],
+        )
+
+        assert response.status_code == 422
+
+    def test_ledger_columns_reflect_sites(
+        self, client: TestClient, account: dict, project: dict
+    ) -> None:
+        """Area and site count in the ledger come from the sites, not a stub."""
+        client.post(
+            "/api/sites",
+            json={"project_id": project["id"], "name": "Block", "boundary": POLYGON},
+            headers=account["headers"],
+        )
+
+        listed = client.get("/api/projects", headers=account["headers"]).json()[0]
+
+        assert listed["site_count"] == 1
+        assert 10_000 < listed["total_area_hectares"] < 12_000
+        assert listed["last_updated"] is not None
 
     def test_projects_are_not_visible_to_other_users(
         self, client: TestClient, account: dict, project: dict
@@ -269,3 +307,68 @@ class TestMetrics:
         response = client.get("/api/sites/99999999/metrics", headers=account["headers"])
 
         assert response.status_code == 404
+
+
+# --- One-click demo access ---------------------------------------------------
+
+
+class TestDemoAccess:
+    """`POST /api/auth/demo` is the primary way a reviewer enters the app.
+
+    It must provision a real, isolated account rather than weakening auth, so
+    these tests check both that it works and that it does not become a hole.
+    """
+
+    def test_demo_issues_a_usable_token(self, client: TestClient) -> None:
+        response = client.post("/api/auth/demo")
+
+        # 503 is the honest answer when the seed has never been run; skipping
+        # keeps this suite meaningful against an empty database rather than
+        # failing for a reason unrelated to the endpoint.
+        if response.status_code == 503:
+            pytest.skip("Demo template data is not seeded in this database.")
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["token_type"] == "bearer"
+
+        headers = {"Authorization": f"Bearer {body['access_token']}"}
+        assert client.get("/api/auth/me", headers=headers).status_code == 200
+
+    def test_demo_guest_receives_a_copy_of_the_sample_projects(self, client: TestClient) -> None:
+        response = client.post("/api/auth/demo")
+        if response.status_code == 503:
+            pytest.skip("Demo template data is not seeded in this database.")
+
+        headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+        projects = client.get("/api/projects", headers=headers).json()
+        assert len(projects) > 0
+
+        collection = client.get("/api/sites", headers=headers).json()
+        assert len(collection["features"]) > 0
+        # Geometry must survive the clone, not just the row count.
+        assert collection["features"][0]["geometry"]["type"] == "Polygon"
+
+    def test_two_demo_guests_are_isolated_from_each_other(self, client: TestClient) -> None:
+        """A reviewer deleting a site must not change what the next one sees."""
+        first = client.post("/api/auth/demo")
+        if first.status_code == 503:
+            pytest.skip("Demo template data is not seeded in this database.")
+        second = client.post("/api/auth/demo")
+
+        first_headers = {"Authorization": f"Bearer {first.json()['access_token']}"}
+        second_headers = {"Authorization": f"Bearer {second.json()['access_token']}"}
+
+        assert first.json()["user"]["id"] != second.json()["user"]["id"]
+
+        first_project_id = client.get("/api/projects", headers=first_headers).json()[0]["id"]
+        # Visible to its owner, invisible to the other guest.
+        assert (
+            client.get(f"/api/projects/{first_project_id}", headers=first_headers).status_code
+            == 200
+        )
+        assert (
+            client.get(f"/api/projects/{first_project_id}", headers=second_headers).status_code
+            == 404
+        )

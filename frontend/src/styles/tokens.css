@@ -1,0 +1,152 @@
+/* =============================================================================
+   Design tokens — DESIGN.md §3.
+
+   The light palette is taken verbatim from §3.4. Dark is an opt-in extra (a
+   documented deviation from §3.1): because no component contains a hex literal,
+   a second theme costs one override block rather than a parallel stylesheet.
+
+   Theming layers, in order of precedence:
+     1. [data-theme="dark"]                  explicit choice
+     2. prefers-color-scheme, when unset     system preference
+   ============================================================================= */
+
+:root {
+  /* --- Palette (§3.1) ---------------------------------------------------- */
+  --moss-900: #22332b;
+  --moss-600: #55665c;
+  --fog-100: #edf0eb;
+  --paper: #fbfcfa;
+  --silt-300: #c7cfc4;
+  --silt-200: #dde3da;
+  --kingfisher-600: #0e6b78;
+  --kingfisher-100: #d5e8ea;
+  --mangrove-600: #3f7d4e;
+  --marigold-400: #e0a526;
+  --redlist-600: #b23a30;
+  --slate-500: #5b6c8f;
+
+  /* Semantic aliases. Components reference these, never the raw ramp, so the
+     dark override below only has to restate a dozen values. */
+  --text: var(--moss-900);
+  --text-muted: var(--moss-600);
+  --bg: var(--fog-100);
+  --surface: var(--paper);
+  --border: var(--silt-300);
+  --rule: var(--silt-200);
+  --accent: var(--kingfisher-600);
+  --accent-soft: var(--kingfisher-100);
+  --accent-text: #ffffff;
+  --positive: var(--mangrove-600);
+  --draft: var(--marigold-400);
+  --negative: var(--redlist-600);
+
+  /* Chart series (§8), in order. */
+  --series-1: #0e6b78;
+  --series-2: #3f7d4e;
+  --series-3: #c98a0e;
+  --series-4: #5b6c8f;
+
+  /* Map (§7). Quoted so cssVarString can strip the quotes. */
+  --map-style-satellite: 'mapbox://styles/mapbox/satellite-streets-v12';
+  --map-style-flat: 'mapbox://styles/mapbox/light-v11';
+
+  /* --- Typography (§3.2) ------------------------------------------------- */
+  --font-serif: 'Source Serif 4 Variable', 'Source Serif 4', Georgia, serif;
+  --font-sans: 'Public Sans Variable', 'Public Sans', system-ui, sans-serif;
+
+  /* --- Spacing (§3.3): 4 8 12 16 24 32 48 -------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* --- Radius: hierarchical, not uniform (§3.3) --------------------------- */
+  --radius-control: 6px;
+  --radius-panel: 10px;
+  --radius-chip: 999px;
+  --radius-map: 0;
+
+  /* --- Elevation ---------------------------------------------------------
+     Exactly one shadow, and only for elements floating over the map (§3.3). */
+  --shadow-float: 0 1px 3px rgb(34 51 43 / 22%);
+
+  /* --- Layout ------------------------------------------------------------ */
+  --header-h: 56px;
+  --ledger-w: 380px;
+  --drawer-w: 520px;
+  --row-h: 48px;
+  --control-h: 40px;
+
+  /* --- Motion (§9) ------------------------------------------------------- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --t-highlight: 120ms;
+  --t-drawer: 220ms;
+  --t-chart: 300ms;
+
+  color-scheme: light;
+}
+
+/* --- Dark: opt-in extra, see docs/design-plan.md --------------------------- */
+
+:root[data-theme='dark'] {
+  --moss-900: #e4ebe4;
+  --moss-600: #9fb0a4;
+  --fog-100: #121814;
+  --paper: #1a221d;
+  --silt-300: #33403a;
+  --silt-200: #2a352f;
+  --kingfisher-600: #4fb8c4;
+  --kingfisher-100: #10333a;
+  --mangrove-600: #6cae7b;
+  --marigold-400: #e8b955;
+  --redlist-600: #e0736a;
+  --slate-500: #8fa2c4;
+
+  --accent-text: #0a1a1d;
+
+  --series-1: #4fb8c4;
+  --series-2: #6cae7b;
+  --series-3: #e0a526;
+  --series-4: #8fa2c4;
+
+  /* Satellite imagery has no dark variant, so the flat alternative is the only
+     style that changes with the theme. */
+  --map-style-flat: 'mapbox://styles/mapbox/dark-v11';
+
+  --shadow-float: 0 1px 3px rgb(0 0 0 / 55%);
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --moss-900: #e4ebe4;
+    --moss-600: #9fb0a4;
+    --fog-100: #121814;
+    --paper: #1a221d;
+    --silt-300: #33403a;
+    --silt-200: #2a352f;
+    --kingfisher-600: #4fb8c4;
+    --kingfisher-100: #10333a;
+    --mangrove-600: #6cae7b;
+    --marigold-400: #e8b955;
+    --redlist-600: #e0736a;
+    --slate-500: #8fa2c4;
+
+    --accent-text: #0a1a1d;
+
+    --series-1: #4fb8c4;
+    --series-2: #6cae7b;
+    --series-3: #e0a526;
+    --series-4: #8fa2c4;
+
+    --map-style-flat: 'mapbox://styles/mapbox/dark-v11';
+
+    --shadow-float: 0 1px 3px rgb(0 0 0 / 55%);
+
+    color-scheme: dark;
+  }
+}
